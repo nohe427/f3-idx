@@ -36,7 +36,7 @@
         "-d",
         "ios",
         "-d",
-        "localhost:5555"
+        "localhost:5566"
       ],
       "id": "ios",
       "manager": "flutter"

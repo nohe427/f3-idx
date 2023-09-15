@@ -1,10 +1,19 @@
 import 'dart:math';
 import 'dart:async';
 
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
-void main() {
+import 'firebase_options.dart';
+
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await Firebase.initializeApp(
+    options: DefaultFirebaseOptions.currentPlatform,
+  );
+
   runApp(const MyApp());
 }
 
@@ -50,10 +59,39 @@ class CounterExample extends StatefulWidget {
 class _CounterExampleState extends State<CounterExample>
     with SingleTickerProviderStateMixin {
   var counter = 0;
+  final db = FirebaseFirestore.instance;
 
-  void _incrementCounter() => setState(() => counter++);
-  void _decrementCounter() => setState(() => counter--);
-  void _resetCounter() => setState(() => counter = 0);
+  @override
+  void initState() {
+    super.initState();
+    _initFirebase();
+  }
+
+  Future<void> _initFirebase() async {
+    final fireDoc = db.collection('demo').doc('demo');
+    fireDoc.snapshots().listen((event) {
+      if (event.exists) {
+        setState(() => counter = event.data()!['counter']);
+      }
+    });
+  }
+
+  void _incrementCounter() => updateCounter(counter + 1);
+  void _decrementCounter() => updateCounter(counter - 1);
+  void _resetCounter() => updateCounter(null);
+
+  void updateCounter(int? count) async {
+    final fireDoc = db.collection('demo').doc('demo');
+    if (count == null) {
+      await fireDoc.update({'counter': 0});
+    } else {
+      if (count > counter) {
+        await fireDoc.update({'counter': FieldValue.increment(1)});
+      } else {
+        await fireDoc.update({'counter': FieldValue.increment(-1)});
+      }
+    }
+  }
 
   (Offset offset, double size, double speed) calculateLocation(
       Offset maxSize, int index) {
