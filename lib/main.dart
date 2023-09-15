@@ -11,7 +11,7 @@ void main() {
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
 
-  ThemeData _buildTheme(Brightness brightness) {
+  ThemeData createTheme(Brightness brightness) {
     const seed = Color(0xFFFFCA28);
     final colors = ColorScheme.fromSeed(
       seedColor: seed,
@@ -33,8 +33,8 @@ class MyApp extends StatelessWidget {
     return MaterialApp(
       title: 'Flutter Counter',
       debugShowCheckedModeBanner: false,
-      theme: _buildTheme(Brightness.light),
-      darkTheme: _buildTheme(Brightness.dark),
+      theme: createTheme(Brightness.light),
+      darkTheme: createTheme(Brightness.dark),
       home: const CounterExample(),
     );
   }
@@ -49,57 +49,67 @@ class CounterExample extends StatefulWidget {
 
 class _CounterExampleState extends State<CounterExample>
     with SingleTickerProviderStateMixin {
-  final _locations = <(Offset, double, double)>[];
+  var counter = 0;
 
-  void _incrementCounter() {
-    final random = Random();
-    const minValue = -0.0;
-    const maxValue = 1.0;
+  void _incrementCounter() => setState(() => counter++);
+  void _decrementCounter() => setState(() => counter--);
+  void _resetCounter() => setState(() => counter = 0);
 
-    final newOffset = Offset(
-      random.nextDouble() * (maxValue - minValue) + minValue,
-      random.nextDouble() * (maxValue - minValue) + minValue,
-    );
-    final newSize = max(30.0, 60.0 * random.nextDouble());
-    final newSpeed = random.nextDouble();
-
-    setState(() {
-      _locations.add((newOffset, newSize, newSpeed));
-    });
-  }
-
-  void _decrementCounter() {
-    if (_locations.isEmpty) return;
-
-    setState(() {
-      _locations.removeLast();
-    });
-  }
-
-  void _resetCounter() {
-    if (_locations.isEmpty) return;
-
-    setState(() {
-      _locations.clear();
-    });
+  (Offset offset, double size, double speed) calculateLocation(
+      Offset maxSize, int index) {
+    final random = Random(index);
+    final size = max(30.0, 90.0 * random.nextDouble());
+    final speed = random.nextDouble();
+    final offset = Offset(random.nextDouble(), random.nextDouble());
+    final normalizedOffset = offset.scale(maxSize.dx - size, maxSize.dy - size);
+    return (normalizedOffset, size, speed);
   }
 
   @override
   Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+    final shadow = Shadow(
+      blurRadius: 0.1,
+      color: colors.surface,
+      offset: const Offset(1.0, 1.0),
+    );
+    final numberDescriptionStyle = textTheme.headlineMedium!.copyWith(
+      shadows: [shadow],
+    );
+    final numberStyle = textTheme.displaySmall?.copyWith(
+      fontWeight: FontWeight.bold,
+      fontSize: 96,
+      shadows: [shadow],
+    );
+    final gridColor = colors.outline.withOpacity(0.50);
+
+    final size = MediaQuery.of(context).size;
+    final padding = MediaQuery.of(context).padding;
+    final maxSize = (size - padding.collapsedSize) as Offset;
+
+    final logos = List<Widget>.generate(counter, (index) {
+      final (offset, radius, speed) = calculateLocation(maxSize, index);
+      return AnimatedPositioned.fromRect(
+        duration: kThemeAnimationDuration,
+        rect: offset & Size.square(radius),
+        child: LogoWidget(speed: speed),
+      );
+    });
+
     return Scaffold(
       body: CustomScrollView(
         slivers: [
           SliverAppBar.large(
-            backgroundColor: Theme.of(context).colorScheme.inversePrimary,
+            backgroundColor: colors.inversePrimary,
             title: const Text('Flutter Counter'),
             actions: [
               IconButton(
                 tooltip: 'Reset Counter',
                 icon: const Icon(Icons.restore),
-                onPressed: _locations.isEmpty
+                onPressed: counter <= 0
                     ? null
-                    : () {
-                        showDialog(
+                    : () => showDialog(
                           context: context,
                           builder: (context) => AlertDialog.adaptive(
                             title: const Text('Reset Counter'),
@@ -118,8 +128,7 @@ class _CounterExampleState extends State<CounterExample>
                               ),
                             ],
                           ),
-                        );
-                      },
+                        ),
               ),
             ],
           ),
@@ -128,70 +137,13 @@ class _CounterExampleState extends State<CounterExample>
             child: SizedBox.expand(
               child: Stack(
                 children: [
+                  Positioned.fill(child: GridPaper(color: gridColor)),
+                  ...logos,
                   Positioned.fill(
-                    child: GridPaper(
-                      color: Theme.of(context)
-                          .colorScheme
-                          .outline
-                          .withOpacity(0.58),
-                    ),
-                  ),
-                  for (final (offset, radius, speed) in _locations)
-                    Builder(builder: (context) {
-                      final size = MediaQuery.of(context).size;
-                      final normalizeOffset = Offset(
-                        size.width * offset.dx,
-                        size.height * offset.dy,
-                      );
-                      return AnimatedPositioned.fromRect(
-                        duration: kThemeAnimationDuration,
-                        rect: normalizeOffset & Size.square(radius),
-                        child: PreviewWidget(speed: speed),
-                      );
-                    }),
-                  Positioned.fill(
-                    child: Center(
-                      child: Padding(
-                        padding: const EdgeInsets.all(20),
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          mainAxisSize: MainAxisSize.min,
-                          children: <Widget>[
-                            Text(
-                              'Distrubted Counter Value:',
-                              style: Theme.of(context)
-                                  .textTheme
-                                  .headlineSmall!
-                                  .copyWith(
-                                shadows: const [
-                                  Shadow(
-                                    blurRadius: 0.1,
-                                    color: Colors.white,
-                                    offset: Offset(1.0, 1.0),
-                                  ),
-                                ],
-                              ),
-                              textAlign: TextAlign.center,
-                            ),
-                            Text(
-                              '${_locations.length}',
-                              style: Theme.of(context)
-                                  .textTheme
-                                  .displaySmall
-                                  ?.copyWith(
-                                fontWeight: FontWeight.bold,
-                                shadows: const [
-                                  Shadow(
-                                    blurRadius: 0.1,
-                                    color: Colors.white,
-                                    offset: Offset(1.0, 1.0),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
+                    child: CounterWidget(
+                      numberDescriptionStyle: numberDescriptionStyle,
+                      counter: counter,
+                      numberStyle: numberStyle,
                     ),
                   ),
                 ],
@@ -210,39 +162,77 @@ class _CounterExampleState extends State<CounterExample>
           ),
           const SizedBox(width: 10),
           FloatingActionButton.small(
-            onPressed: _locations.isEmpty ? null : _decrementCounter,
+            onPressed: counter == 0 ? null : _decrementCounter,
             tooltip: 'Decrement',
             child: const Icon(Icons.remove),
           ),
         ],
-      ), // This trailing comma makes auto-formatting nicer for build methods.
+      ),
     );
   }
 }
 
-class PreviewWidget extends StatefulWidget {
-  const PreviewWidget({super.key, required this.speed});
+class CounterWidget extends StatelessWidget {
+  const CounterWidget({
+    super.key,
+    required this.numberDescriptionStyle,
+    required this.counter,
+    required this.numberStyle,
+  });
+
+  final TextStyle numberDescriptionStyle;
+  final int counter;
+  final TextStyle? numberStyle;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      mainAxisAlignment: MainAxisAlignment.center,
+      mainAxisSize: MainAxisSize.min,
+      children: <Widget>[
+        Text(
+          'Distributed Counter:',
+          style: numberDescriptionStyle,
+        ),
+        Text(
+          '$counter',
+          style: numberStyle,
+        ),
+      ],
+    );
+  }
+}
+
+class LogoWidget extends StatefulWidget {
+  const LogoWidget({super.key, required this.speed});
 
   final double speed;
 
   @override
-  State<PreviewWidget> createState() => _PreviewWidgetState();
+  State<LogoWidget> createState() => _LogoWidgetState();
 }
 
-class _PreviewWidgetState extends State<PreviewWidget> {
+class _LogoWidgetState extends State<LogoWidget> {
   double turns = Random().nextDouble();
+  late Timer timer;
 
   @override
   void initState() {
     super.initState();
-    Timer.periodic(Duration(milliseconds: max(300, 500 * widget.speed).round()),
-        (_) {
-      _changeRotation();
-    });
+    timer = Timer.periodic(
+      Duration(milliseconds: max(300, 500 * widget.speed).round()),
+      (_) => _changeRotation(),
+    );
   }
 
   void _changeRotation() {
     setState(() => turns += 1.0 / 8.0);
+  }
+
+  @override
+  void dispose() {
+    timer.cancel();
+    super.dispose();
   }
 
   @override
